@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aplikasi Catatan Cloudflare + SQL</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #f97316;
+      --accent-hover: #ea580c;
+      --border: #334155;
+      --danger: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 680px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .badge {
+      display: inline-block;
+      background: rgba(249, 115, 22, 0.15);
+      color: var(--accent);
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      border: 1px solid rgba(249, 115, 22, 0.3);
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    p.subtitle {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    input, textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      color: var(--text);
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input:focus, textarea:focus {
+      border-color: var(--accent);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    button.btn-primary {
+      background-color: var(--accent);
+      color: white;
+      border: none;
+      padding: 0.75rem 1.25rem;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    button.btn-primary:hover {
+      background-color: var(--accent-hover);
+    }
+
+    .notes-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .note-item {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      transition: transform 0.2s;
+    }
+
+    .note-item:hover {
+      transform: translateY(-2px);
+    }
+
+    .note-title {
+      font-weight: 600;
+      font-size: 1.1rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .note-content {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+
+    .btn-delete {
+      background: transparent;
+      border: 1px solid var(--danger);
+      color: var(--danger);
+      padding: 0.35rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .btn-delete:hover {
+      background: var(--danger);
+      color: white;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <span class="badge">Cloudflare Pages + SQL D1</span>
+      <h1>Aplikasi Catatan Cloud</h1>
+      <p class="subtitle">Latihan membuat Web App Fullstack dengan Database SQL gratis di Cloudflare</p>
+    </header>
+
+    <div class="card">
+      <form id="noteForm" class="form-group">
+        <input type="text" id="title" placeholder="Judul Catatan..." required>
+        <textarea id="content" placeholder="Isi catatan Anda di sini..." required></textarea>
+        <button type="submit" class="btn-primary">Simpan ke Database SQL</button>
+      </form>
+    </div>
+
+    <div class="notes-list" id="notesList">
+      <div class="empty-state">Memuat data dari database...</div>
+    </div>
+  </div>
+
+  <script>
+    const notesList = document.getElementById('notesList');
+    const noteForm = document.getElementById('noteForm');
+
+    // Fetch notes from API
+    async function loadNotes() {
+      try {
+        const res = await fetch('/api/notes');
+        const notes = await res.json();
+        
+        if (!Array.isArray(notes) || notes.length === 0) {
+          notesList.innerHTML = '<div class="empty-state">Belum ada catatan. Tambahkan catatan pertama Anda di atas!</div>';
+          return;
+        }
+
+        notesList.innerHTML = notes.map(note => `
+          <div class="note-item">
+            <div>
+              <div class="note-title">${escapeHtml(note.title)}</div>
+              <div class="note-content">${escapeHtml(note.content)}</div>
+            </div>
+            <button class="btn-delete" onclick="deleteNote(${note.id})">Hapus</button>
+          </div>
+        `).join('');
+      } catch (err) {
+        notesList.innerHTML = '<div class="empty-state" style="color: #ef4444;">Gagal memuat catatan dari database backend.</div>';
+      }
+    }
+
+    // Add note
+    noteForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const title = document.getElementById('title').value;
+      const content = document.getElementById('content').value;
+
+      try {
+        const res = await fetch('/api/notes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, content })
+        });
+
+        if (res.ok) {
+          noteForm.reset();
+          loadNotes();
+        } else {
+          alert('Gagal menyimpan data ke database.');
+        }
+      } catch (err) {
+        alert('Terjadi kesalahan jaringan.');
+      }
+    });
+
+    // Delete note
+    async function deleteNote(id) {
+      if (!confirm('Yakin ingin menghapus catatan ini?')) return;
+      try {
+        const res = await fetch(`/api/notes?id=${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          loadNotes();
+        } else {
+          alert('Gagal menghapus catatan.');
+        }
+      } catch (err) {
+        alert('Terjadi kesalahan jaringan.');
+      }
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    loadNotes();
+  </script>
+</body>
+</html>
