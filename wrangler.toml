@@ -1,0 +1,8 @@
+name = "aplikasi-catatan-cloudflare"
+compatibility_date = "2024-01-01"
+pages_build_output_dir = "./"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "db-catatan"
+database_id = "408f3d5b-b0bd-40a2-ad09-257b58500eab"
